@@ -280,10 +280,6 @@ pdf_redactor/
 
 ## 10. Known limitations / honest notes
 
-- **Screenshots**: not included in this deliverable — generating real
-  screenshots requires a running display session with rendered PDFs,
-  which this environment can't produce. Run the app locally to capture
-  your own; the usage walkthrough above describes each screen.
 - **Split before/after preview** (item 9 in the spec) is architected
   for (the `PreviewScene`/`PreviewView` split cleanly from redaction
   logic so a second synchronized view is a small addition) but the
