@@ -13,6 +13,7 @@ content in those regions, then saves a new PDF.
 - It does not strip, bypass, or alter embedded security features,
   digital signatures, or encryption beyond what's required to open a
   file the user already has legitimate access to.
+<img width="1366" height="736" alt="image" src="https://github.com/user-attachments/assets/7838c252-0cf5-4d39-9c60-a49264815a9f" />
 
 ---
 
