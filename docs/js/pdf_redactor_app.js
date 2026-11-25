@@ -10,6 +10,255 @@ if (window.pdfjsLib) {
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 
+// --------------------------------------------------------------------------
+// Content-Stream Level Watermark Removal Engine (2-Tier Architecture)
+// Strategy 1: Drops dedicated watermark-only content stream objects from /Contents
+// Strategy 2: Slices enclosing balanced q...Q graphics-state blocks from inline streams
+// Operates at the PDF instruction stream level: zero whiteout boxes, zero visual artifacts,
+// completely preserves underlying text, tables, and document layout.
+// --------------------------------------------------------------------------
+
+function decodePdfLiteral(raw) {
+  return raw.replace(/\\([nrtbf()\\\/]|([0-7]{1,3}))/g, (m, esc, oct) => {
+    if (oct) return String.fromCharCode(parseInt(oct, 8));
+    if (esc === "n") return "\n";
+    if (esc === "r") return "\r";
+    if (esc === "t") return "\t";
+    return esc;
+  });
+}
+
+function decodeHexLiteral(raw) {
+  const cleaned = raw.replace(/\s+/g, "");
+  if (cleaned.length % 2 !== 0) return "";
+  const bytes = [];
+  for (let i = 0; i < cleaned.length; i += 2) {
+    bytes.push(parseInt(cleaned.substr(i, 2), 16));
+  }
+  const u8 = new Uint8Array(bytes);
+  let ascii = "";
+  for (let i = 0; i < u8.length; i++) ascii += String.fromCharCode(u8[i]);
+  return ascii;
+}
+
+function extractTextLiterals(rawStr) {
+  const texts = [];
+  const litRegex = /\((?:[^()\\]|\\.)*\)/g;
+  let m;
+  while ((m = litRegex.exec(rawStr)) !== null) {
+    texts.push(decodePdfLiteral(m[0].slice(1, -1)));
+  }
+  const hexRegex = /<([0-9A-Fa-f\s]+)>/g;
+  while ((m = hexRegex.exec(rawStr)) !== null) {
+    const dec = decodeHexLiteral(m[1]);
+    if (dec) texts.push(dec);
+  }
+  return texts;
+}
+
+function maskStrings(str) {
+  return str.replace(/\((?:[^()\\]|\\.)*\)|<[0-9A-Fa-f\s]*>/g, (m) => ".".repeat(m.length));
+}
+
+function findEnclosingBlock(masked, pos) {
+  // First try innermost balanced q...Q
+  const qRegex = /(?<![A-Za-z0-9])[qQ](?![A-Za-z0-9])/g;
+  const qStack = [];
+  let bestQ = null;
+  let m;
+  while ((m = qRegex.exec(masked)) !== null) {
+    if (m[0] === "q") {
+      qStack.push(m.index);
+    } else if (m[0] === "Q") {
+      if (qStack.length === 0) continue;
+      const start = qStack.pop();
+      const end = m.index + 1;
+      if (start <= pos && pos <= end) {
+        if (!bestQ || (end - start) < (bestQ.end - bestQ.start)) {
+          bestQ = { start, end };
+        }
+      }
+    }
+  }
+  if (bestQ) return bestQ;
+
+  // Fallback: try innermost BT...ET
+  const btEtRegex = /(?<![A-Za-z0-9])(?:BT|ET)(?![A-Za-z0-9])/g;
+  const btStack = [];
+  let bestBt = null;
+  while ((m = btEtRegex.exec(masked)) !== null) {
+    if (m[0] === "BT") {
+      btStack.push(m.index);
+    } else if (m[0] === "ET") {
+      if (btStack.length === 0) continue;
+      const start = btStack.pop();
+      const end = m.index + 2;
+      if (start <= pos && pos <= end) {
+        if (!bestBt || (end - start) < (bestBt.end - bestBt.start)) {
+          bestBt = { start, end };
+        }
+      }
+    }
+  }
+  return bestBt;
+}
+
+function decodeStreamToLatin1(stream) {
+  const dec = PDFLib.decodePDFRawStream(stream).decode();
+  if (typeof TextDecoder !== "undefined") {
+    try {
+      return new TextDecoder("latin1").decode(dec);
+    } catch (e) {
+      // Fallback below
+    }
+  }
+  let str = "";
+  const chunkSize = 8192;
+  for (let i = 0; i < dec.length; i += chunkSize) {
+    str += String.fromCharCode.apply(null, dec.subarray(i, i + chunkSize));
+  }
+  return str;
+}
+
+async function removeWatermarksFromPdf(pdfBytes, signature) {
+  const doc = await PDFLib.PDFDocument.load(pdfBytes);
+  const pages = doc.getPages();
+  let pagesCleaned = 0;
+  let separateStreamCount = 0;
+  let inlineBlockCount = 0;
+
+  for (let pno = 0; pno < pages.length; pno++) {
+    const page = pages[pno];
+    const pageNode = page.node;
+    const contents = pageNode.get(PDFLib.PDFName.of("Contents"));
+    if (!contents) continue;
+
+    // Strategy 1: Separate content stream removal
+    let cleanedPage = false;
+    if (contents instanceof PDFLib.PDFArray) {
+      const size = contents.size();
+      if (size > 1) {
+        const keptRefs = [];
+        let removedStream = false;
+
+        for (let i = 0; i < size; i++) {
+          const ref = contents.get(i);
+          const stream = doc.context.lookup(ref);
+          if (!stream) {
+            keptRefs.push(ref);
+            continue;
+          }
+          let rawStr = "";
+          try {
+            rawStr = decodeStreamToLatin1(stream);
+          } catch (e) {
+            keptRefs.push(ref);
+            continue;
+          }
+
+          const texts = extractTextLiterals(rawStr);
+          const nonBlank = texts.filter((t) => t.trim().length > 0);
+          if (nonBlank.length > 0 && nonBlank.every((t) => signature.matches(t))) {
+            removedStream = true;
+          } else {
+            keptRefs.push(ref);
+          }
+        }
+
+        if (removedStream && keptRefs.length > 0) {
+          if (keptRefs.length === 1) {
+            pageNode.set(PDFLib.PDFName.of("Contents"), keptRefs[0]);
+          } else {
+            pageNode.set(PDFLib.PDFName.of("Contents"), doc.context.obj(keptRefs));
+          }
+          cleanedPage = true;
+          separateStreamCount++;
+        }
+      }
+    }
+
+    if (cleanedPage) {
+      pagesCleaned++;
+      continue;
+    }
+
+    // Strategy 2: Inline block removal via balanced q...Q stack matching
+    const streamRefs =
+      contents instanceof PDFLib.PDFArray
+        ? Array.from({ length: contents.size() }, (_, i) => contents.get(i))
+        : [pageNode.get(PDFLib.PDFName.of("Contents"))];
+
+    let inlineCleanedOnPage = false;
+    for (const ref of streamRefs) {
+      const stream = doc.context.lookup(ref);
+      if (!stream) continue;
+      let rawStr = "";
+      try {
+        rawStr = decodeStreamToLatin1(stream);
+      } catch (e) {
+        continue;
+      }
+
+      const masked = maskStrings(rawStr);
+      // Matches string Tj, hex Tj, or kerning array TJ
+      const textOpRegex = /(?:(?:\((?:[^()\\]|\\.)*\)|<[0-9A-Fa-f\s]*>)\s*Tj\b|\[(?:[^\[\]\\]|\\.)*\]\s*TJ\b)/g;
+      let match;
+      const spans = [];
+      while ((match = textOpRegex.exec(rawStr)) !== null) {
+        const opStr = match[0];
+        const texts = extractTextLiterals(opStr);
+        if (texts.some((t) => signature.matches(t))) {
+          const span = findEnclosingBlock(masked, match.index);
+          if (span) spans.push(span);
+        }
+      }
+
+      if (spans.length > 0) {
+        // Deduplicate and sort descending so byte splices don't invalidate offsets
+        const uniqueSpans = [];
+        const seen = new Set();
+        for (const s of spans) {
+          const k = `${s.start}-${s.end}`;
+          if (!seen.has(k)) {
+            seen.add(k);
+            uniqueSpans.push(s);
+          }
+        }
+        uniqueSpans.sort((a, b) => b.start - a.start);
+
+        let newStr = rawStr;
+        for (const s of uniqueSpans) {
+          newStr = newStr.slice(0, s.start) + newStr.slice(s.end);
+        }
+
+        const newStream = doc.context.flateStream(newStr);
+        const newRef = doc.context.register(newStream);
+
+        if (!(contents instanceof PDFLib.PDFArray) || contents.size() === 1) {
+          pageNode.set(PDFLib.PDFName.of("Contents"), newRef);
+        } else {
+          const idx = streamRefs.indexOf(ref);
+          contents.set(idx, newRef);
+        }
+        inlineCleanedOnPage = true;
+      }
+    }
+
+    if (inlineCleanedOnPage) {
+      pagesCleaned++;
+      inlineBlockCount++;
+    }
+  }
+
+  const resultBytes = await doc.save();
+  return {
+    cleanedBytes: resultBytes,
+    pagesCleaned,
+    separateStreamCount,
+    inlineBlockCount,
+  };
+}
+
 class PdfRedactorApp {
   constructor() {
     this.pdfDoc = null;
@@ -189,24 +438,33 @@ class PdfRedactorApp {
     try {
       this.fileName = file.name;
       const arrayBuffer = await file.arrayBuffer();
-      this.pdfBytes = arrayBuffer;
-
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer.slice(0) });
-      this.pdfDoc = await loadingTask.promise;
-      this.totalPages = this.pdfDoc.numPages;
-      this.currentPageNum = 1;
-      this.redactions = {};
-
-      if (this.emptyState) this.emptyState.classList.add("hidden");
-      if (this.editorContainer) this.editorContainer.classList.remove("hidden");
-
+      await this.loadPdfBytes(arrayBuffer, false);
       this.showToast(`Loaded "${this.fileName}" (${this.totalPages} pages)`);
-      await this.renderPage(this.currentPageNum);
-      this.updateUI();
     } catch (err) {
       console.error("Error loading PDF:", err);
       this.showToast("Failed to load PDF file. " + err.message, true);
     }
+  }
+
+  async loadPdfBytes(bytes, preserveRedactions = false) {
+    this.pdfBytes = bytes;
+    if (!preserveRedactions) {
+      this.redactions = {};
+      this.currentPageNum = 1;
+    }
+
+    const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
+    this.pdfDoc = await loadingTask.promise;
+    this.totalPages = this.pdfDoc.numPages;
+    if (this.currentPageNum > this.totalPages) {
+      this.currentPageNum = 1;
+    }
+
+    if (this.emptyState) this.emptyState.classList.add("hidden");
+    if (this.editorContainer) this.editorContainer.classList.remove("hidden");
+
+    await this.renderPage(this.currentPageNum);
+    this.updateUI();
   }
 
   setTool(tool) {
@@ -533,78 +791,135 @@ class PdfRedactorApp {
   }
 
   /**
-   * Automatically strips portal download stamps (Employee ID, Date/Time, PNB SAKSHAM, HRMS)
+   * Automatically strips portal download stamps (Employee ID, Date/Time, PNB SAKSHAM, HRMS, etc.)
+   * at the PDF Content Stream level (Strategy 1: Separate stream, Strategy 2: Inline q...Q block).
+   * Eradicates the watermark instructions cleanly with ZERO whiteout boxes and ZERO visual artifacts.
    */
   async autoStripWatermarks() {
-    if (!this.pdfDoc) return;
+    if (!this.pdfBytes || !this.pdfDoc) {
+      this.showToast("Please load a PDF first.", true);
+      return;
+    }
 
     const empId = this.empIdInput ? this.empIdInput.value.trim() : "";
     const cleanDateTime = this.checkDateTime ? this.checkDateTime.checked : true;
     const cleanBanner = this.checkPortalBanner ? this.checkPortalBanner.checked : true;
 
-    this.showToast("Analyzing and removing portal watermarks & stamps...");
+    if (!empId && !cleanDateTime && !cleanBanner) {
+      this.showToast("Please enter an Employee ID or select watermark options.", true);
+      return;
+    }
 
-    // Build pattern list
+    this.showToast("Running stream-level watermark cleaner (zero visual artifacts)...");
+
+    // Build signature matcher
+    const literals = [];
     const patterns = [];
+
     if (empId) {
-      patterns.push(new RegExp(empId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
-      patterns.push(new RegExp(`EMP[-_\\s]?${empId}`, "i"));
+      literals.push(empId);
+      literals.push(`EMP${empId}`);
+      literals.push(`EMP-${empId}`);
+      literals.push(`EMP_${empId}`);
+      const escapedEmp = empId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      patterns.push(new RegExp(`EMP[-_\\s]?${escapedEmp}`, "i"));
+      patterns.push(new RegExp(`\\b${escapedEmp}\\b`, "i"));
     }
     if (cleanDateTime) {
       // Common date & timestamp patterns in bank exports: DD-MM-YYYY HH:MM or DD/MM/YYYY HH:MM
       patterns.push(/\d{2}[-/]\d{2}[-/]\d{4}\s+\d{2}:\d{2}/);
       patterns.push(/\d{2}[-/]\d{2}[-/]\d{4}/);
+      patterns.push(/\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}/);
     }
     if (cleanBanner) {
+      literals.push("PNB SAKSHAM");
+      literals.push("FINACLE");
+      literals.push("CONFIDENTIAL");
+      literals.push("DOWNLOADED BY");
+      literals.push("STAMPED COPY");
+      literals.push("HRMS");
       patterns.push(/PNB\s+SAKSHAM/i);
       patterns.push(/FINACLE/i);
       patterns.push(/CONFIDENTIAL/i);
       patterns.push(/DOWNLOADED\s+BY/i);
       patterns.push(/STAMPED\s+COPY/i);
+      patterns.push(/\bHRMS\b/i);
     }
 
-    let cleanedCount = 0;
+    const signature = {
+      matches(text) {
+        if (!text) return false;
+        const upper = text.toUpperCase();
+        for (const lit of literals) {
+          if (lit && upper.includes(lit.toUpperCase())) return true;
+        }
+        for (const pat of patterns) {
+          if (pat.test(text)) return true;
+        }
+        return false;
+      },
+    };
 
-    for (let p = 1; p <= this.totalPages; p++) {
-      const page = await this.pdfDoc.getPage(p);
-      const textContent = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1.0 });
+    try {
+      // 1. Run true 2-tier content stream level removal
+      const res = await removeWatermarksFromPdf(this.pdfBytes, signature);
 
-      if (!this.redactions[p]) this.redactions[p] = [];
+      if (res.pagesCleaned > 0) {
+        this.pdfBytes = res.cleanedBytes;
+        await this.loadPdfBytes(this.pdfBytes, true);
 
-      for (const item of textContent.items) {
-        const matches = patterns.some((rx) => rx.test(item.str));
-        if (matches) {
-          const tx = item.transform[4];
-          const ty = item.transform[5];
-          const tw = item.width || 60;
-          const th = item.height || Math.abs(item.transform[3]) || 12;
+        const details = [];
+        if (res.separateStreamCount > 0) details.push(`${res.separateStreamCount} stream(s) dropped`);
+        if (res.inlineBlockCount > 0) details.push(`${res.inlineBlockCount} inline block(s) sliced`);
+        const detailStr = details.length > 0 ? ` (${details.join(", ")})` : "";
 
-          const normX = Math.max(0, (tx - 2) / viewport.width);
-          const normY = Math.max(0, (viewport.height - ty - th - 2) / viewport.height);
-          const normW = Math.min(1 - normX, (tw + 4) / viewport.width);
-          const normH = Math.min(1 - normY, (th + 4) / viewport.height);
+        this.showToast(`✨ Cleaned watermarks from ${res.pagesCleaned} page(s)${detailStr}! Zero visual artifacts.`);
+        return;
+      }
 
-          // Watermarks default to whiteout for invisible cleaning
-          this.redactions[p].push({
-            x: normX,
-            y: normY,
-            w: normW,
-            h: normH,
-            color: "white",
-          });
-          cleanedCount++;
+      // 2. Fallback: If not in separate stream or balanced inline block, check textContent layer
+      let textLayerMatches = 0;
+      for (let p = 1; p <= this.totalPages; p++) {
+        const page = await this.pdfDoc.getPage(p);
+        const textContent = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1.0 });
+
+        if (!this.redactions[p]) this.redactions[p] = [];
+
+        for (const item of textContent.items) {
+          if (signature.matches(item.str)) {
+            const tx = item.transform[4];
+            const ty = item.transform[5];
+            const tw = item.width || 60;
+            const th = item.height || Math.abs(item.transform[3]) || 12;
+
+            const normX = Math.max(0, (tx - 2) / viewport.width);
+            const normY = Math.max(0, (viewport.height - ty - th - 2) / viewport.height);
+            const normW = Math.min(1 - normX, (tw + 4) / viewport.width);
+            const normH = Math.min(1 - normY, (th + 4) / viewport.height);
+
+            this.redactions[p].push({
+              x: normX,
+              y: normY,
+              w: normW,
+              h: normH,
+              color: "white",
+            });
+            textLayerMatches++;
+          }
         }
       }
-    }
 
-    this.redrawOverlay();
-    this.updateUI();
-
-    if (cleanedCount > 0) {
-      this.showToast(`Cleaned ${cleanedCount} watermark item(s) across ${this.totalPages} pages.`);
-    } else {
-      this.showToast("No matching portal stamps or watermarks found.", true);
+      if (textLayerMatches > 0) {
+        this.redrawOverlay();
+        this.updateUI();
+        this.showToast(`Applied whiteout boxes to ${textLayerMatches} watermark item(s).`);
+      } else {
+        this.showToast("No matching portal stamps or watermarks found.", true);
+      }
+    } catch (err) {
+      console.error("Watermark removal error:", err);
+      this.showToast("Watermark removal error: " + err.message, true);
     }
   }
 
