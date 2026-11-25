@@ -3,177 +3,181 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDF Redactor &amp; Watermark Cleaner — 100% Offline &amp; Private</title>
+  <title>PDF Redactor & Watermark Cleaner — 100% Offline & Private</title>
   <meta name="description" content="Secure, client-side PDF redaction and download stamp / watermark removal tool for banking and privacy-sensitive documents." />
 
-  <!-- Tailwind CSS & Lucide Icons -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- PDF.js & pdf-lib CDNs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 
-  <!-- Custom Styles -->
+  <!-- Custom Styles (Pure CSS, 100% Self-Contained) -->
   <link rel="stylesheet" href="css/styles.css" />
 </head>
-<body class="bg-slate-100 text-slate-800 flex flex-col h-screen overflow-hidden">
+<body>
 
   <!-- Top Navigation Header -->
-  <header class="text-white px-5 py-3 flex items-center justify-between shadow-md flex-shrink-0">
-    <div class="flex items-center space-x-3">
-      <div class="logo-icon w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">
-        <i data-lucide="shield-check" class="w-6 h-6"></i>
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="header-logo">
+        <i data-lucide="shield-check" style="width:22px; height:22px;"></i>
       </div>
-      <div>
-        <h1 class="text-base font-semibold leading-tight flex items-center gap-2">
-          <span class="title-gradient font-bold text-lg">PDF Redactor Studio</span>
-          <span class="text-xs font-normal bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 pulse-badge">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            100% Client-Side &amp; Private
+      <div class="header-title-wrap">
+        <div class="header-title-row">
+          <span class="header-title">PDF Redactor Studio</span>
+          <span class="privacy-badge">
+            <span class="dot"></span>
+            100% Private &amp; Offline
           </span>
-        </h1>
-        <p class="text-xs text-slate-400">Permanently redact sensitive customer data &amp; clean portal stamps without server uploads</p>
+        </div>
+        <p class="header-subtitle">Client-side document redaction &amp; portal stamp removal • Zero server uploads</p>
       </div>
     </div>
 
     <!-- Quick Actions -->
-    <div class="flex items-center space-x-3">
-      <label for="file-input" class="cursor-pointer bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3.5 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2">
-        <i data-lucide="upload" class="w-4 h-4"></i>
+    <div class="header-actions">
+      <label for="file-input" class="btn-open-pdf">
+        <i data-lucide="upload" style="width:16px; height:16px;"></i>
         <span>Open PDF</span>
       </label>
-      <input type="file" id="file-input" accept="application/pdf" class="hidden" />
+      <input type="file" id="file-input" accept="application/pdf" style="display:none;" />
 
-      <button id="btn-download" class="text-white font-medium px-4 py-1.5 rounded-lg text-sm flex items-center gap-2 shadow-sm">
-        <i data-lucide="download" class="w-4 h-4"></i>
+      <button id="btn-download" class="btn-export-pdf">
+        <i data-lucide="download" style="width:16px; height:16px;"></i>
         <span>Export Redacted PDF</span>
       </button>
     </div>
   </header>
 
   <!-- Empty State (No File Loaded) -->
-  <main id="empty-state" class="flex-1 flex flex-col items-center justify-center p-6 text-center">
-    <div id="drop-zone" class="bg-white rounded-2xl p-12 max-w-xl w-full shadow-sm cursor-pointer flex flex-col items-center" onclick="document.getElementById('file-input').click()">
+  <main id="empty-state">
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
 
-      <!-- Big pulsing icon -->
-      <div class="drop-icon-wrap w-20 h-20 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5">
-        <i data-lucide="file-text" class="w-10 h-10"></i>
+      <div class="drop-icon-box">
+        <i data-lucide="file-text" style="width:32px; height:32px;"></i>
       </div>
 
-      <h3 class="text-xl font-bold mb-1 drop-heading-gradient">Drag &amp; Drop your PDF here</h3>
-      <p class="text-sm text-slate-500 mb-5">or click anywhere to browse from your computer</p>
+      <h2 class="drop-title">Drag &amp; Drop your PDF here</h2>
+      <p class="drop-desc">or click anywhere to browse a document from your computer</p>
 
-      <div class="inline-flex items-center gap-2 text-xs text-slate-400 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full">
-        <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-600"></i>
+      <div class="privacy-notice">
+        <i data-lucide="lock" style="width:14px; height:14px;"></i>
         <span>Files stay entirely on your device. Zero cloud transmission.</span>
       </div>
 
-      <!-- Feature highlights – card-like pills -->
-      <div class="grid grid-cols-3 gap-3 mt-8 pt-6 border-t border-slate-100 text-left w-full">
-        <div class="feature-pill">
-          <p class="text-xs font-semibold text-slate-700 flex items-center gap-1 mb-1">
-            <i data-lucide="scissors" class="w-3.5 h-3.5 text-blue-600"></i> Box Redaction
+      <!-- Feature highlights -->
+      <div class="feature-grid">
+        <div class="feature-item">
+          <p class="feature-item-title">
+            <i data-lucide="scissors" style="width:14px; height:14px; color:#2563eb;"></i> Box Redaction
           </p>
-          <p class="text-[11px] text-slate-500 leading-snug">Drag &amp; blackout or whiteout any text or image</p>
+          <p class="feature-item-desc">Drag &amp; blackout or whiteout any text or image</p>
         </div>
-        <div class="feature-pill purple">
-          <p class="text-xs font-semibold text-slate-700 flex items-center gap-1 mb-1">
-            <i data-lucide="stamp" class="w-3.5 h-3.5 text-violet-600"></i> Watermark Strip
+        <div class="feature-item purple">
+          <p class="feature-item-title">
+            <i data-lucide="stamp" style="width:14px; height:14px; color:#7c3aed;"></i> Watermark Strip
           </p>
-          <p class="text-[11px] text-slate-500 leading-snug">Remove portal download stamps &amp; timestamps</p>
+          <p class="feature-item-desc">Remove portal download stamps &amp; timestamps</p>
         </div>
-        <div class="feature-pill green">
-          <p class="text-xs font-semibold text-slate-700 flex items-center gap-1 mb-1">
-            <i data-lucide="search" class="w-3.5 h-3.5 text-emerald-600"></i> Auto Patterns
+        <div class="feature-item green">
+          <p class="feature-item-title">
+            <i data-lucide="search" style="width:14px; height:14px; color:#059669;"></i> Auto Patterns
           </p>
-          <p class="text-[11px] text-slate-500 leading-snug">Auto-redact Aadhaar, PAN, and Account numbers</p>
+          <p class="feature-item-desc">Auto-redact Aadhaar, PAN, and Account numbers</p>
         </div>
       </div>
     </div>
   </main>
 
   <!-- Editor Workspace (Visible when PDF is loaded) -->
-  <main id="editor-container" class="flex-1 flex overflow-hidden hidden">
+  <main id="editor-container" class="hidden">
 
     <!-- Left Controls Sidebar -->
-    <aside class="w-80 border-r border-slate-200 flex flex-col justify-between flex-shrink-0 overflow-y-auto">
-      <div class="p-4 space-y-5">
+    <aside class="sidebar-panel">
+      <div class="sidebar-content">
 
         <!-- 1. Redaction Tools Section -->
-        <div class="sidebar-section">
-          <label class="section-label block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">🔲 Redaction Mode</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btn-tool-blackout" class="tool-btn active flex items-center justify-center gap-2 p-2.5 rounded-lg border border-slate-300 text-sm font-medium">
+        <div class="menu-card">
+          <label class="menu-section-header">
+            <i data-lucide="square" style="width:14px; height:14px; color:#2563eb;"></i>
+            <span>Redaction Mode</span>
+          </label>
+          <div class="tool-btn-group">
+            <button id="btn-tool-blackout" class="tool-btn active">
               <span class="swatch-black"></span>
               <span>Blackout</span>
             </button>
-            <button id="btn-tool-whiteout" class="tool-btn flex items-center justify-center gap-2 p-2.5 rounded-lg border border-slate-300 text-sm font-medium">
+            <button id="btn-tool-whiteout" class="tool-btn">
               <span class="swatch-white"></span>
               <span>Whiteout</span>
             </button>
           </div>
-          <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
-            <i data-lucide="info" class="w-3.5 h-3.5 text-slate-400 flex-shrink-0"></i>
-            Click and drag directly on the page to draw boxes.
+          <p class="tool-hint">
+            <i data-lucide="info" style="width:13px; height:13px;"></i>
+            <span>Click and drag on page to draw boxes</span>
           </p>
         </div>
 
         <!-- 2. Portal Stamp & Watermark Cleaner -->
-        <div class="sidebar-section border-t border-slate-100 pt-2">
-          <label class="section-label block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
-            🧹 Portal Watermark Removal
+        <div class="menu-card">
+          <label class="menu-section-header">
+            <i data-lucide="stamp" style="width:14px; height:14px; color:#2563eb;"></i>
+            <span>Portal Watermark Removal</span>
           </label>
-          <div class="space-y-2.5">
+          <div style="display:flex; flex-direction:column; gap:8px;">
             <div>
-              <label class="text-xs text-slate-600 font-medium">Employee / User ID</label>
-              <input type="text" id="emp-id-input" placeholder="e.g. 5135265" class="w-full text-sm border border-slate-300 rounded-lg px-2.5 py-1.5 mt-0.5 focus:outline-none focus:border-blue-500" />
+              <label class="input-label">Employee / User ID</label>
+              <input type="text" id="emp-id-input" placeholder="e.g. 5135265" class="app-input" />
             </div>
 
-            <div class="space-y-1.5 text-xs text-slate-600">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="check-date-time" checked class="rounded text-blue-600 focus:ring-0" />
+            <div class="checkbox-row">
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-date-time" checked />
                 <span>Date &amp; Time stamp (DD-MM-YYYY HH:MM)</span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" id="check-portal-banner" checked class="rounded text-blue-600 focus:ring-0" />
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-portal-banner" checked />
                 <span>Portal banners (PNB SAKSHAM, Finacle)</span>
               </label>
             </div>
 
-            <button id="btn-strip-watermarks" class="w-full text-white text-xs font-medium py-2.5 rounded-lg flex items-center justify-center gap-1.5 shadow-sm">
-              ✨ <span>Clean All Watermarks</span>
+            <button id="btn-strip-watermarks" class="btn-clean-watermarks">
+              <i data-lucide="sparkles" style="width:14px; height:14px;"></i>
+              <span>Clean All Watermarks</span>
             </button>
           </div>
         </div>
 
         <!-- 3. Search & Auto-Redact Section -->
-        <div class="sidebar-section border-t border-slate-100 pt-2">
-          <label class="section-label block text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
-            🔍 Search &amp; Redact
+        <div class="menu-card">
+          <label class="menu-section-header">
+            <i data-lucide="search" style="width:14px; height:14px; color:#2563eb;"></i>
+            <span>Search &amp; Redact</span>
           </label>
-          <div class="space-y-2">
-            <div class="flex gap-1.5">
-              <input type="text" id="search-input" placeholder="Keyword or pattern..." class="flex-1 text-sm border border-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500" />
-              <button id="btn-search-redact" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-3 rounded-lg flex items-center justify-center">
+          <div>
+            <div class="search-row">
+              <input type="text" id="search-input" placeholder="Keyword or pattern..." class="app-input" style="flex:1;" />
+              <button id="btn-search-redact" class="btn-search">
                 Redact
               </button>
             </div>
 
             <!-- Quick Presets -->
             <div>
-              <p class="text-[11px] text-slate-500 mb-1.5 font-medium">Banking Presets:</p>
-              <div class="flex flex-wrap gap-1.5">
-                <button class="preset-btn preset-aadhaar text-[11px]" data-pattern="/\b\d{4}\s?\d{4}\s?\d{4}\b/">
+              <p class="preset-title">Banking Presets:</p>
+              <div class="presets-wrap">
+                <button class="preset-btn preset-aadhaar" data-pattern="/\b\d{4}\s?\d{4}\s?\d{4}\b/">
                   Aadhaar
                 </button>
-                <button class="preset-btn preset-pan text-[11px]" data-pattern="/\b[A-Z]{5}[0-9]{4}[A-Z]\b/">
+                <button class="preset-btn preset-pan" data-pattern="/\b[A-Z]{5}[0-9]{4}[A-Z]\b/">
                   PAN
                 </button>
-                <button class="preset-btn preset-mobile text-[11px]" data-pattern="/\b[6-9]\d{9}\b/">
+                <button class="preset-btn preset-mobile" data-pattern="/\b[6-9]\d{9}\b/">
                   Mobile
                 </button>
-                <button class="preset-btn preset-account text-[11px]" data-pattern="/\b\d{12,16}\b/">
+                <button class="preset-btn preset-account" data-pattern="/\b\d{12,16}\b/">
                   Account No
                 </button>
               </div>
@@ -182,18 +186,21 @@
         </div>
 
         <!-- 4. Page Management -->
-        <div class="sidebar-section border-t border-slate-100 pt-2 space-y-2">
-          <label class="section-label block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Page Redactions</label>
-          <div class="flex gap-2">
-            <button id="btn-clear-page" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-lg border border-slate-200">
+        <div class="menu-card">
+          <label class="menu-section-header">
+            <i data-lucide="layers" style="width:14px; height:14px; color:#2563eb;"></i>
+            <span>Page Redactions</span>
+          </label>
+          <div class="btn-row">
+            <button id="btn-clear-page" class="btn-outline-gray">
               Clear Current Page
             </button>
-            <button id="btn-clear-all" class="flex-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-medium py-1.5 rounded-lg border border-red-200">
+            <button id="btn-clear-all" class="btn-outline-red">
               Clear All
             </button>
           </div>
-          <button onclick="window.app.applyCurrentBoxesToAllPages()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-1.5 rounded-lg border border-slate-200 flex items-center justify-center gap-1">
-            <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+          <button onclick="window.app.applyCurrentBoxesToAllPages()" class="btn-full-gray">
+            <i data-lucide="copy" style="width:13px; height:13px;"></i>
             <span>Apply Current Boxes to All Pages</span>
           </button>
         </div>
@@ -201,51 +208,51 @@
       </div>
 
       <!-- Security Guarantee Footer in Sidebar -->
-      <div class="security-footer p-3 text-[11px] flex items-start gap-2.5">
+      <div class="security-footer">
         <span class="security-footer-icon">
-          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <i data-lucide="shield-check" style="width:16px; height:16px;"></i>
         </span>
         <span>Document metadata (author, title, history) is scrubbed automatically on export.</span>
       </div>
     </aside>
 
     <!-- Center Document Viewport -->
-    <section class="flex-1 flex flex-col overflow-hidden">
+    <section class="viewport-section">
 
       <!-- Viewport Toolbar -->
-      <div class="toolbar-bar border-b border-slate-200 px-4 py-2 flex items-center justify-between text-xs text-slate-600 flex-shrink-0 shadow-sm">
+      <div class="viewport-toolbar">
         <!-- Pagination -->
-        <div class="flex items-center space-x-1">
-          <button id="prev-page-btn" class="p-1 rounded hover:bg-slate-100 text-slate-600 disabled:opacity-40">
-            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        <div class="toolbar-group">
+          <button id="prev-page-btn" class="tb-btn" disabled title="Previous page">
+            <i data-lucide="chevron-left" style="width:14px; height:14px;"></i>
           </button>
           <span id="page-info">Page 1 of 1</span>
-          <button id="next-page-btn" class="p-1 rounded hover:bg-slate-100 text-slate-600 disabled:opacity-40">
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          <button id="next-page-btn" class="tb-btn" disabled title="Next page">
+            <i data-lucide="chevron-right" style="width:14px; height:14px;"></i>
           </button>
         </div>
 
         <!-- Zoom Controls -->
-        <div class="zoom-group">
-          <button id="zoom-out-btn" class="p-1 text-slate-600">
-            <i data-lucide="zoom-out" class="w-4 h-4"></i>
+        <div class="toolbar-group">
+          <button id="zoom-out-btn" class="tb-btn" title="Zoom out">
+            <i data-lucide="zoom-out" style="width:14px; height:14px;"></i>
           </button>
-          <span id="zoom-level" class="font-medium text-slate-700 w-12 text-center">125%</span>
-          <button id="zoom-in-btn" class="p-1 text-slate-600">
-            <i data-lucide="zoom-in" class="w-4 h-4"></i>
+          <span id="zoom-level">125%</span>
+          <button id="zoom-in-btn" class="tb-btn" title="Zoom in">
+            <i data-lucide="zoom-in" style="width:14px; height:14px;"></i>
           </button>
         </div>
 
         <!-- Statistics -->
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400">Status:</span>
-          <span id="redaction-stats" class="font-semibold text-blue-600">0 on page / 0 total</span>
+        <div class="status-indicator">
+          <span class="status-label">Status:</span>
+          <span id="redaction-stats">0 on page / 0 total</span>
         </div>
       </div>
 
       <!-- Canvas Scroll Area -->
-      <div class="canvas-scroll-area flex-1 overflow-auto p-8 flex items-center justify-center">
-        <div id="canvas-container" class="relative">
+      <div class="canvas-scroll-area">
+        <div id="canvas-container">
           <canvas id="pdf-canvas"></canvas>
           <canvas id="overlay-canvas"></canvas>
         </div>
@@ -256,8 +263,8 @@
   </main>
 
   <!-- Toast Notification -->
-  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 flex items-center gap-2 text-white text-xs font-medium px-4 py-2.5 shadow-xl opacity-0 transform translate-y-4">
-    <i data-lucide="info" class="w-4 h-4 flex-shrink-0"></i>
+  <div id="toast" class="hidden">
+    <i data-lucide="info" style="width:16px; height:16px; flex-shrink:0;"></i>
     <span id="toast-msg">Notification message</span>
   </div>
 
