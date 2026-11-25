@@ -3,6 +3,18 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Python](https://img.shields.io/badge/python-3.8+-blue)
 ![Status](https://img.shields.io/badge/status-Beta-yellow)
+[![Live WebApp](https://img.shields.io/badge/Live_WebApp-Open_Online-brightgreen?logo=github)](https://tumesh007.github.io/Pdf-Redactor/)
+
+## 🌐 Live Web Application (Zero Install)
+
+Use the web version directly in your browser with **zero installation** and **100% offline privacy** (all processing runs locally in your browser sandbox, no files are ever uploaded):
+
+👉 **[https://tumesh007.github.io/Pdf-Redactor/](https://tumesh007.github.io/Pdf-Redactor/)**
+
+- **Box Redaction:** Click & drag to draw permanent Blackout or Whiteout redactions.
+- **Portal Watermark Stripping:** Automatically detect and remove Employee IDs, download timestamps (`DD-MM-YYYY HH:MM`), and PNB SAKSHAM / Finacle banners.
+- **Banking Presets:** 1-click search & redact for Aadhaar numbers, PAN cards, phone numbers, and account numbers.
+- **Privacy Guaranteed:** Metadata is automatically stripped; runs completely on client-side JS/WASM.
 
 ## Overview
 
